@@ -13,6 +13,7 @@ Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
   - [Assets and the fallback chain](#assets-and-the-fallback-chain)
   - [Embedding assets in emails and PDFs](#embedding-assets-in-emails-and-pdfs)
   - [Caching with the version](#caching-with-the-version)
+- [API stability](#api-stability)
 - [API reference](#api-reference)
 
 ## Overview
@@ -31,7 +32,7 @@ Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
 | `ColorMath` | Contrast, mixes, derived shades, contrast warnings. |
 
 Every value object validates on construction and throws `InvalidArgumentException` on a bad value, so a consumer
-never sees an empty name, a non-hex colour, an unknown slot or an unsafe URL.
+never sees an empty name, a non-hex colour, an unknown slot, an asset that is not a `BrandAsset` or an unsafe URL.
 
 ## Providing a brand
 
@@ -66,8 +67,9 @@ final class AppBrandProvider implements BrandProviderInterface
 Rules for providers:
 
 - Return a brand with your defaults and `isDefault: true` while nothing is stored; never an empty name.
-- Put in `assets` only the slots that resolve (an upload or a config default), keyed by slot. The cross-slot fallback
-  chain is applied by `Brand::asset()`, not by the provider.
+- Put in `assets` only the slots that resolve (an upload or a config default), keyed by slot; every value must be a
+  `BrandAsset` whose `slot` equals its key. The cross-slot fallback chain is applied by `Brand::asset()`, not by the
+  provider.
 - An uploaded asset must be PNG, JPEG or WebP (`BrandAsset` refuses anything else with origin `Uploaded`). Config
   default assets (committed files) may be SVG or ICO.
 - Memoise per request if building the brand costs a query, and reset the memo between requests in a worker.
@@ -96,11 +98,13 @@ work with a broken database should wrap `getBrand()` in a `try` and fall back to
 
 ### Name, short name, eyebrow, wordmark
 
-- `name`: never empty, no control characters.
+- `name`: trimmed; never blank or invisible-only, no control characters, bidi controls or line separators (see
+  [SECURITY.md](SECURITY.md#text-fields)). `" Beacon "` is stored as `Beacon`.
 - `shortName`: at most 12 grapheme clusters; defaults to the name cut at 12 (`International Widgets` → `Internationa`).
+  The same rules and trimming apply to every text field (`shortName`, a string `eyebrow`, `wordmark`).
 - `eyebrow`: `null`, a string, or a `TranslatableInterface` (an untouched default that follows the viewer's locale).
   `eyebrowText($translator, $locale)` gives the text either way.
-- `wordmark`: defaults to the lower-cased name.
+- `wordmark`: defaults to the lower-cased (trimmed) name.
 
 ### Colours
 
@@ -118,7 +122,9 @@ ColorMath::contrastRatio('#0f1c18', '#f3f6f4');
 `ColorMath::shades()` returns the hex equivalents of UiKit's derived tokens (`primary-hover`, `primary-contrast`,
 `border`, `border-strong`, `accent-soft`, `surface-muted`, `paper-accent`, `paper-ink`, `muted`, `brand-mark`) for
 renderers without `color-mix()`. Pass the border percentage of the border strength in use (default 14, UiKit
-"medium" light).
+"medium" light). `shades()` follows UiKit's `AppearanceCssEmitter` (2.38 today): when UiKit derives a new token, a
+minor release may add a key, so read the keys you need instead of relying on the exact key set. `border-strong`
+currently equals `border`, as in UiKit.
 
 Mapping to UiKit's palette: primary = accent, primaryDeep = accent_deep, warning = warn, text = ink; danger, paper and
 surface keep their names.
@@ -167,9 +173,36 @@ if (null !== $mark && $mark->isInlineSafe() && $mark->isSvg()) {
 ### Caching with the version
 
 `Brand::$version` is a 16-character hash of every field (asset order does not matter). Use it in ETags and cache
-keys; add the locale when the eyebrow is translatable (its text depends on the locale, the version does not; a
-translatable is identified by its class and its string form, which is the message key for Symfony's
-`TranslatableMessage`).
+keys; add the locale when the eyebrow is translatable (its text depends on the locale, the version does not).
+
+What the version covers for a translatable eyebrow:
+
+- its class and its string form (`(string) $eyebrow`), which is the message key for Symfony's `TranslatableMessage`;
+- **not** its translation domain or parameters: the same key in another domain, or with other parameters, gives the
+  same version;
+- for a translatable that is not `Stringable`, only its class: two such eyebrows of the same class always give the same
+  version. Custom translatables must be `Stringable` (returning at least the key) to be versioned.
+
+Change the key, not only the domain or parameters, when the default eyebrow changes and caches must follow. A string
+form that is not valid UTF-8 is refused with `InvalidArgumentException`. The version is a cache key, not a security
+token, and the hashing scheme may change in a minor release (never rely on a literal value).
+
+## API stability
+
+1.x follows semantic versioning. What may change in a minor release:
+
+- **Colours.** `BrandColors` may gain colour keys (for example `success`, `info`). They arrive as optional trailing
+  constructor parameters with a default, and `fromArray()` will accept them as optional keys; the seven current keys
+  stay required. Use named arguments or `fromArray()` when you build colours, and never assume `KEYS` / `toArray()` has
+  exactly seven entries.
+- **Asset origins.** `BrandAssetOrigin` may gain cases (for example sanitised SVG uploads). Decide whether bytes may be
+  inlined with `BrandAsset::isInlineSafe()`, never with an exhaustive `match` over the enum.
+- **Shades.** `ColorMath::shades()` follows UiKit's emitter and may gain keys.
+- **Version.** The algorithm behind `Brand::$version` may change; only its length (`VERSION_LENGTH`) and its
+  "changes when a field changes" property are stable.
+
+A stricter validation rule is a behaviour change for providers: after 1.0.0 it ships in a minor with a CHANGELOG and
+UPGRADING note.
 
 ## API reference
 

@@ -24,9 +24,12 @@ framework wiring, no default provider.
   `isExtra()`, `extra()` and `assertValid()` refuse everything else.
 
 - **FR-002**: `BrandProviderInterface::getBrand(): Brand` is the only provider seam; the package ships no provider.
-- **FR-003**: `Brand` refuses an empty or blank name, control characters or invalid UTF-8 in text fields, a short name
-  over 12 grapheme clusters and an asset whose key differs from its slot. Defaults: short name = trimmed name cut at
-  12 graphemes (trailing space trimmed), wordmark = `mb_strtolower(name)`, empty eyebrow = null.
+- **FR-003**: `Brand` refuses, in text fields, invalid UTF-8, values that are blank or invisible-only (Unicode
+  whitespace and `\p{Cf}`), control characters, bidi embedding / override / isolate controls (U+202A–U+202E,
+  U+2066–U+2069) and `\p{Zl}` / `\p{Zp}` (ZWJ / ZWNJ inside text stay allowed); a short name over 12 grapheme
+  clusters; an asset value that is not a `BrandAsset` and an asset whose key differs from its slot; a translatable
+  eyebrow whose string form is not valid UTF-8. Text fields are trimmed of Unicode whitespace. Defaults: short name =
+  trimmed name cut at 12 graphemes (trailing space trimmed), wordmark = `mb_strtolower(name)`, empty eyebrow = null.
 - **FR-004**: `Brand::asset()` applies the chain of spec 220 section 4.2 (logo_dark → logo_light; mark → app_icon;
   app_icon → mark when square ±2 % and ≥ 512 px; favicon → mark → app_icon; extra itself) and refuses unknown slots.
 - **FR-005**: `Brand::$version` is the first 16 hex characters of a SHA-256 over every field, independent of asset
@@ -34,7 +37,8 @@ framework wiring, no default provider.
 - **FR-006**: `BrandColors` accepts `#rrggbb` only (lower-cased); `primaryContrast()` picks surface or text by WCAG
   ratio (surface on a tie); `mix()` accepts colour names or hex.
 - **FR-007**: `BrandAsset` accepts root-relative or `https://host[:port]` URLs only (printable ASCII, no quotes, angle
-  brackets, backticks, backslashes, whitespace or userinfo, ≤ 2048), `image/*` types, positive or null dimensions and
+  brackets, backticks, backslashes, commas, parentheses, whitespace or userinfo, ≤ 2048; host of non-empty labels,
+  port 1–65535), `image/*` types, positive or null dimensions and
   64-hex sha256; uploads must be PNG, JPEG or WebP; `isInlineSafe()` is true only for `ConfigDefault` (Q-O4).
 - **FR-008**: `BrandAssetDataUri` takes the type from PNG / JPEG / WebP magic bytes and accepts other bytes only from
   inline-safe assets; empty bytes are refused.

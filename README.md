@@ -65,7 +65,8 @@ None: the package has no configuration. See [docs/CONFIGURATION.md](docs/CONFIGU
 
 ## Usage
 
-See [docs/USAGE.md](docs/USAGE.md).
+See [docs/USAGE.md](docs/USAGE.md). What may change in a 1.x minor (new optional colour keys, new `BrandAssetOrigin`
+cases, new `shades()` keys) is listed under [API stability](docs/USAGE.md#api-stability).
 
 ## Development
 
