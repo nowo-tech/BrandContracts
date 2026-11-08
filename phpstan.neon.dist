@@ -1,0 +1,23 @@
+# PHPStan configuration for Brand Contracts (REQ-CS-006: level max, no ignores).
+#
+# Run: make phpstan
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - vendor/*
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors: []
+    # Machine-wide cap: at most 2 worker processes on shared developer hosts.
+    parallel:
+        maximumNumberOfProcesses: 2
+
+includes:
+  - vendor/nowo-tech/phpstan-frankenphp/extension.neon
+  - vendor/nowo-tech/phpstan-frankenphp/ruleset-classic.neon
+  # worker-strict includes default worker rules + request-superglobal hygiene (kernel not reset).
+  - vendor/nowo-tech/phpstan-frankenphp/ruleset-worker-strict.neon
+  - vendor/nowo-tech/phpstan-frankenphp/ruleset-hardening.neon

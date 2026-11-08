@@ -1,0 +1,120 @@
+{
+    "name": "nowo-tech/brand-contracts",
+    "description": "Shared brand contract for PHP apps and nowo-tech bundles: brand name, colours and logo assets a host provides, plus colour math for emails and PDFs. Framework-free.",
+    "type": "library",
+    "keywords": [
+        "php",
+        "brand",
+        "branding",
+        "white-label",
+        "theme",
+        "logo",
+        "colors",
+        "wcag",
+        "contracts",
+        "nowo",
+        "frankenphp"
+    ],
+    "homepage": "https://github.com/nowo-tech/BrandContracts",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Héctor Franco Aceituno",
+            "email": "hectorfranco@nowo.tech",
+            "homepage": "https://github.com/HecFranco",
+            "role": "Maintainer"
+        },
+        {
+            "name": "Nowo.tech",
+            "homepage": "https://nowo.tech"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/nowo-tech/BrandContracts/issues",
+        "source": "https://github.com/nowo-tech/BrandContracts",
+        "docs": "https://github.com/nowo-tech/BrandContracts/tree/main/docs",
+        "changelog": "https://github.com/nowo-tech/BrandContracts/blob/main/docs/CHANGELOG.md"
+    },
+    "require": {
+        "php": ">=8.2 <8.6",
+        "ext-mbstring": "*",
+        "symfony/translation-contracts": "^3.4"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "igor-php/igor-php": "^0.10.1",
+        "nowo-tech/phpstan-frankenphp": "^1.0",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.5",
+        "rector/rector": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nowo\\Brand\\Contract\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nowo\\Brand\\Contract\\Tests\\": "tests/"
+        }
+    },
+    "archive": {
+        "exclude": [
+            "/demo",
+            "/.cursor",
+            "/.specify",
+            "/specs",
+            "/tests"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2.0"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --color=always",
+        "test-coverage": "phpunit --color=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text",
+        "test-coverage-100": [
+            "@test-coverage",
+            "php .scripts/check-coverage.php coverage.xml --min-percent=100"
+        ],
+        "validate-phpdoc": "php .scripts/complete-public-phpdoc.php",
+        "cs-check": "php-cs-fixer fix --dry-run --diff",
+        "cs-fix": "php-cs-fixer fix",
+        "rector": "rector process",
+        "rector-dry": "rector process --dry-run --no-progress-bar",
+        "phpstan": "phpstan analyse --memory-limit=512M",
+        "update": "composer update --no-interaction",
+        "validate": "composer validate --strict",
+        "qa": [
+            "@cs-check",
+            "@phpstan",
+            "@test"
+        ],
+        "igor": "igor-php --no-agent ."
+    },
+    "scripts-descriptions": {
+        "test": "Run PHPUnit tests",
+        "test-coverage": "Run PHPUnit tests with code coverage",
+        "test-coverage-100": "Run test-coverage and fail if statement or element coverage is below 100% (REQ-TEST-003)",
+        "validate-phpdoc": "Fail when a class or public method in src/ has no PHPDoc (REQ-CS-001)",
+        "cs-check": "Check code style with PHP-CS-Fixer",
+        "cs-fix": "Fix code style with PHP-CS-Fixer",
+        "rector": "Apply Rector refactoring",
+        "rector-dry": "Run Rector in dry-run mode",
+        "phpstan": "Run PHPStan static analysis",
+        "update": "Update composer.lock (composer update)",
+        "validate": "Validate composer.json (composer validate --strict)",
+        "qa": "Run all quality assurance checks",
+        "igor": "Run Igor FrankenPHP worker-state audit (REQ-CS-008)"
+    }
+}
