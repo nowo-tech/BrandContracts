@@ -1,5 +1,179 @@
 # Usage
 
-The API lands in 1.0.0 (nowo-tech spec 220, slice S0): `BrandProviderInterface`, `Brand`, `BrandColors`,
-`BrandAsset`, `BrandAssetOrigin`, `BrandAssetSlot`, `BrandAssetReaderInterface` and `ColorMath`. This page documents
-them once they are merged.
+Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
+
+## Table of contents
+
+- [Overview](#overview)
+- [Providing a brand](#providing-a-brand)
+- [Consuming the brand](#consuming-the-brand)
+  - [Symfony wiring](#symfony-wiring)
+  - [Name, short name, eyebrow, wordmark](#name-short-name-eyebrow-wordmark)
+  - [Colours](#colours)
+  - [Assets and the fallback chain](#assets-and-the-fallback-chain)
+  - [Embedding assets in emails and PDFs](#embedding-assets-in-emails-and-pdfs)
+  - [Caching with the version](#caching-with-the-version)
+- [API reference](#api-reference)
+
+## Overview
+
+| Type | Role |
+| --- | --- |
+| `BrandProviderInterface` | `getBrand(): Brand`. Implemented by a provider (InstanceSettings, a host class). |
+| `Brand` | Name, short name, eyebrow, wordmark, light / dark colours, assets, `isDefault`, `version`. |
+| `BrandColors` | Seven `#rrggbb` colours of one mode. |
+| `BrandAsset` | One image: slot, URL, media type, size, sha256, origin. |
+| `BrandAssetOrigin` | `Uploaded` or `ConfigDefault`. |
+| `BrandAssetSlot` | Slot names: `logo_light`, `logo_dark`, `mark`, `app_icon`, `favicon`, `extra.<id>`. |
+| `BrandAssetReaderInterface` | Bytes of an asset or of a variant, for CID attachments and data URIs. |
+| `BrandAssetReadException` | Thrown by readers. |
+| `BrandAssetDataUri` | Data URI / media type from bytes, with the inlining rule. |
+| `ColorMath` | Contrast, mixes, derived shades, contrast warnings. |
+
+Every value object validates on construction and throws `InvalidArgumentException` on a bad value, so a consumer
+never sees an empty name, a non-hex colour, an unknown slot or an unsafe URL.
+
+## Providing a brand
+
+InstanceSettingsBundle (1.5+) provides the brand from its `brand` and `appearance` sections. Without it, a host class
+is enough:
+
+```php
+use Nowo\Brand\Contract\Brand;
+use Nowo\Brand\Contract\BrandAsset;
+use Nowo\Brand\Contract\BrandAssetOrigin;
+use Nowo\Brand\Contract\BrandColors;
+use Nowo\Brand\Contract\BrandProviderInterface;
+
+final class AppBrandProvider implements BrandProviderInterface
+{
+    public function getBrand(): Brand
+    {
+        return new Brand(
+            name: 'Beacon',
+            light: new BrandColors('#1f6f54', '#134736', '#b42318', '#b54708', '#f3f6f4', '#0f1c18', '#ffffff'),
+            dark: new BrandColors('#4aad7f', '#6bc49a', '#f97066', '#fdb022', '#0c1210', '#e6eee9', '#151c19'),
+            assets: [
+                'mark' => new BrandAsset('mark', '/brand/beacon-mark.svg', 'image/svg+xml', null, null,
+                    hash_file('sha256', __DIR__.'/../public/brand/beacon-mark.svg'), BrandAssetOrigin::ConfigDefault),
+            ],
+            isDefault: true,
+        );
+    }
+}
+```
+
+Rules for providers:
+
+- Return a brand with your defaults and `isDefault: true` while nothing is stored; never an empty name.
+- Put in `assets` only the slots that resolve (an upload or a config default), keyed by slot. The cross-slot fallback
+  chain is applied by `Brand::asset()`, not by the provider.
+- An uploaded asset must be PNG, JPEG or WebP (`BrandAsset` refuses anything else with origin `Uploaded`). Config
+  default assets (committed files) may be SVG or ICO.
+- Memoise per request if building the brand costs a query, and reset the memo between requests in a worker.
+
+## Consuming the brand
+
+### Symfony wiring
+
+Inject the provider as optional and keep your own configuration as the fallback:
+
+```php
+public function __construct(
+    #[Autowire(service: BrandProviderInterface::class, onInvalid: ContainerInterface::NULL_ON_INVALID_REFERENCE)]
+    private readonly ?BrandProviderInterface $brand = null,
+    private readonly string $configuredSiteName = 'My App',
+) {}
+
+private function siteName(): string
+{
+    return $this->brand?->getBrand()->name ?? $this->configuredSiteName;
+}
+```
+
+In a YAML service definition: `'@?Nowo\Brand\Contract\BrandProviderInterface'`. Error pages and other code that must
+work with a broken database should wrap `getBrand()` in a `try` and fall back to config.
+
+### Name, short name, eyebrow, wordmark
+
+- `name`: never empty, no control characters.
+- `shortName`: at most 12 grapheme clusters; defaults to the name cut at 12 (`International Widgets` → `Internationa`).
+- `eyebrow`: `null`, a string, or a `TranslatableInterface` (an untouched default that follows the viewer's locale).
+  `eyebrowText($translator, $locale)` gives the text either way.
+- `wordmark`: defaults to the lower-cased name.
+
+### Colours
+
+```php
+$colors = $brand->colors(dark: false);       // BrandColors, same as $brand->light
+$colors->primary;                            // '#1f6f54' (always lower-case #rrggbb)
+$colors->primaryContrast();                  // '#ffffff': surface or text, whichever contrasts more
+$colors->mix('primary', 10, 'paper');        // '#dee9e4' = color-mix(in srgb, primary 10%, paper)
+
+ColorMath::shades($colors);                  // ['accent-soft' => '#dee9e4', 'border' => '#d3d7d5', ...]
+ColorMath::contrastWarnings($colors);        // [] or ['text_on_paper', ...] (advisory, never blocking)
+ColorMath::contrastRatio('#0f1c18', '#f3f6f4');
+```
+
+`ColorMath::shades()` returns the hex equivalents of UiKit's derived tokens (`primary-hover`, `primary-contrast`,
+`border`, `border-strong`, `accent-soft`, `surface-muted`, `paper-accent`, `paper-ink`, `muted`, `brand-mark`) for
+renderers without `color-mix()`. Pass the border percentage of the border strength in use (default 14, UiKit
+"medium" light).
+
+Mapping to UiKit's palette: primary = accent, primaryDeep = accent_deep, warning = warn, text = ink; danger, paper and
+surface keep their names.
+
+### Assets and the fallback chain
+
+```php
+$favicon = $brand->asset(BrandAssetSlot::FAVICON);   // favicon → mark → app_icon → null
+if (null === $favicon) {
+    // print your own <link rel="icon">, or nothing
+}
+```
+
+| Slot | Chain |
+| --- | --- |
+| `logo_light` | itself (then the consumer renders mark + name text) |
+| `logo_dark` | itself → `logo_light` |
+| `mark` | itself → `app_icon` (then the name initial) |
+| `app_icon` | itself → `mark` if square (±2 %) and at least 512 px (then the consumer's own icons) |
+| `favicon` | itself → `mark` → `app_icon` |
+| `extra.<id>` | itself |
+
+The returned asset keeps its own `slot`. `url` is safe for an `<img src>` / `<link href>` attribute (still escape it
+as usual). Never put it in a CSS `url()` custom property.
+
+### Embedding assets in emails and PDFs
+
+Use the provider's `BrandAssetReaderInterface` to get bytes, and follow the inlining rule (spec 220, section 7.5):
+
+```php
+$mark = $brand->asset(BrandAssetSlot::MARK);
+if (null !== $mark && $mark->isInlineSafe() && $mark->isSvg()) {
+    $svg = $reader->read($mark);                          // trusted committed SVG: may be inlined
+} elseif (null !== $mark) {
+    $src = BrandAssetDataUri::fromBytes($mark, $reader->read($mark));   // <img src="data:image/png;base64,...">
+}
+```
+
+- `isInlineSafe()` is true only for `ConfigDefault` assets. Uploaded bytes never go into markup.
+- `BrandAssetDataUri::fromBytes()` / `mimeTypeOf()` take the type from the bytes (PNG, JPEG, WebP magic); other bytes
+  are accepted only from an inline-safe asset. Use `mimeTypeOf()` for a CID attachment's content type.
+- Variants (`read($asset, 192)`) are generated square PNGs; which sizes exist is the provider's business
+  (InstanceSettings: 180, 192, 512 for `app_icon`; 32, 16 for `favicon`). A missing variant throws
+  `BrandAssetReadException`.
+
+### Caching with the version
+
+`Brand::$version` is a 16-character hash of every field (asset order does not matter). Use it in ETags and cache
+keys; add the locale when the eyebrow is translatable (its text depends on the locale, the version does not; a
+translatable is identified by its class and its string form, which is the message key for Symfony's
+`TranslatableMessage`).
+
+## API reference
+
+Every public class and method carries a PHPDoc block in `src/`. Public constants: `Brand::SHORT_NAME_MAX`,
+`Brand::VERSION_LENGTH`, `BrandColors::KEYS`, `BrandAsset::UPLOAD_MIME_TYPES`, `BrandAsset::SVG_MIME_TYPE`,
+`BrandAsset::MAX_URL_LENGTH`, `BrandAsset::SQUARE_TOLERANCE`, `BrandAssetSlot::*`, `ColorMath::AA_TEXT`,
+`ColorMath::AA_NON_TEXT`, `ColorMath::DEFAULT_BORDER_PERCENT`.

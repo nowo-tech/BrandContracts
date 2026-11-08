@@ -44,7 +44,7 @@ The sections below state **behavior**; this subsection states **intent** in back
 **In scope**
 
 - `BrandProviderInterface`, `Brand`, `BrandColors`, `BrandAsset`, `BrandAssetOrigin`, `BrandAssetSlot`,
-  `BrandAssetReaderInterface`, `ColorMath` (1.0.0).
+  `BrandAssetReaderInterface`, `BrandAssetReadException`, `BrandAssetDataUri`, `ColorMath` (1.0.0).
 - Validation rules of the value objects and the inlining rule documented in [`SECURITY.md`](SECURITY.md).
 
 **Explicit non-goals**

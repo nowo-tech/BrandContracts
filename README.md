@@ -10,16 +10,25 @@ tiny, framework-free package (interfaces and value objects, plus colour math for
 `color-mix()`). A provider implements one interface; every consumer works without a provider and keeps its own
 configuration as the fallback. PHP 8.2+.
 
-> **Status:** repository scaffold (only `BrandAssetSlot` so far). The rest of the API (`BrandProviderInterface`,
-> `Brand`, `BrandColors`, `BrandAsset`, `BrandAssetReaderInterface`, `ColorMath`) lands in **1.0.0** (nowo-tech
-> spec 220, slice S0).
-
 ![FrankenPHP Friendly Worker Mode](docs/images/frankenphp-friendly.png)
 
 This bundle is **FrankenPHP worker mode friendly**.
 
 Value objects are immutable and the package keeps no static state, so a worker that never resets the kernel is safe.
 See [docs/FRANKENPHP-WORKER-AUDIT.md](docs/FRANKENPHP-WORKER-AUDIT.md).
+
+## Features
+
+- **`BrandProviderInterface`**: one method, `getBrand(): Brand`. InstanceSettings implements it; a host can too, in a
+  few lines. No default provider: consumers keep their config as the fallback.
+- **`Brand`**: name (never empty), short name (at most 12 graphemes), eyebrow (string or translatable), wordmark,
+  light and dark `BrandColors`, resolved assets, `isDefault` and a `version` hash for ETags and cache keys.
+- **Logo fallback chain**: `Brand::asset('favicon')` tries favicon, mark, app icon (spec 220, section 4.2).
+- **`BrandColors`**: seven `#rrggbb` colours per mode, validated and lower-cased; `primaryContrast()`, `mix()`.
+- **`ColorMath`**: WCAG luminance and contrast, sRGB mixes equal to CSS `color-mix(in srgb, …)`, UiKit's derived
+  shades in hex, the advisory contrast checks.
+- **Safe assets**: `BrandAsset` accepts only root-relative or `https://` URLs; uploads are raster only and never
+  inline-safe; `BrandAssetDataUri` builds data URIs from sniffed bytes for emails and PDFs.
 
 ## Installation
 
@@ -28,6 +37,22 @@ composer require nowo-tech/brand-contracts
 ```
 
 See [docs/INSTALLATION.md](docs/INSTALLATION.md).
+
+## Quick start
+
+```php
+use Nowo\Brand\Contract\BrandProviderInterface;
+
+final class InvoiceMailer
+{
+    public function __construct(private readonly ?BrandProviderInterface $brand = null) {}
+
+    public function senderName(): string
+    {
+        return $this->brand?->getBrand()->name ?? 'My App';   // own config stays the fallback
+    }
+}
+```
 
 ## Requirements
 
@@ -78,7 +103,8 @@ make release-check
 
 ## Tests and coverage
 
-- Tests: PHPUnit (PHP), unit tests only (no I/O, no framework)
+- Tests: PHPUnit (PHP), unit tests only (no I/O, no framework): validation tables, fallback chains, colour math
+  checked against UiKit's emitter values for the Beacon palette
 - PHP: 100% (gate enforced in CI by `composer test-coverage-100`, no exclusions)
 - TS/JS: N/A
 - Python: N/A
