@@ -1,0 +1,20 @@
+---
+description: PHP library rules
+globs:
+  - "src/**/*.php"
+alwaysApply: false
+---
+
+Target PHP >=8.2 (<8.6). The only runtime dependency besides PHP extensions is `symfony/translation-contracts`; do not add a framework dependency.
+
+Prefer:
+- modern PHP with strict typing and explicit return types
+- PSR-12 coding style
+- final readonly classes for value objects
+- validation in constructors (fail fast, never a half-built object)
+- no I/O in value objects
+- PHPDoc in English for every class and public method
+
+This package is a contract with a 1.x lifetime of years: never break a public signature, constant or property.
+Do not add PHPDoc in Spanish.
+Do not touch unrelated namespaces or files.
