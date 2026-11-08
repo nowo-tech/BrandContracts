@@ -74,7 +74,8 @@ jobs:
       - name: Install dependencies (${{ matrix.deps }})
         run: |
           if [ "${{ matrix.deps }}" = "lowest" ]; then
-            composer update --prefer-lowest --prefer-stable --no-interaction --prefer-dist --no-progress
+            # Lowest runtime dependencies only (QA tools stay at their locked versions).
+            composer update symfony/translation-contracts --with-dependencies --prefer-lowest --prefer-stable --no-interaction --prefer-dist --no-progress
           else
             composer update --with-all-dependencies --no-interaction --prefer-dist --no-progress
           fi
