@@ -106,6 +106,47 @@ final class BrandTest extends TestCase
         yield 'newline in eyebrow' => [['eyebrow' => "a\nb"], 'Brand eyebrow must not contain control characters.'];
         yield 'empty wordmark' => [['wordmark' => ''], 'Brand wordmark must not be empty.'];
         yield 'C1 control in wordmark' => [['wordmark' => "be\u{85}acon"], 'Brand wordmark must not contain control characters.'];
+        // IP-L2: values that render as nothing.
+        yield 'zero-width space name' => [['name' => "\u{200B}"], 'Brand name must not be empty.'];
+        yield 'NBSP name' => [['name' => "\u{00A0}"], 'Brand name must not be empty.'];
+        yield 'ideographic space name' => [['name' => "\u{3000} \u{2009}"], 'Brand name must not be empty.'];
+        yield 'BOM and word joiner short name' => [['shortName' => "\u{FEFF}\u{2060}"], 'Brand short name must not be empty.'];
+        yield 'ZWJ only eyebrow' => [['eyebrow' => "\u{200D}\u{200C}"], 'Brand eyebrow must not be empty.'];
+        // IP-L2: bidi controls and line / paragraph separators.
+        yield 'RLO in name' => [['name' => "Ac\u{202E}me"], 'Brand name must not contain bidirectional controls or line separators.'];
+        yield 'LRE in short name' => [['shortName' => "a\u{202A}b"], 'Brand short name must not contain bidirectional controls or line separators.'];
+        yield 'RLI in eyebrow' => [['eyebrow' => "a\u{2067}b\u{2069}"], 'Brand eyebrow must not contain bidirectional controls or line separators.'];
+        yield 'FSI in wordmark' => [['wordmark' => "a\u{2068}b"], 'Brand wordmark must not contain bidirectional controls or line separators.'];
+        yield 'line separator in name' => [['name' => "a\u{2028}b"], 'Brand name must not contain bidirectional controls or line separators.'];
+        yield 'paragraph separator in name' => [['name' => "a\u{2029}b"], 'Brand name must not contain bidirectional controls or line separators.'];
+        yield 'invalid UTF-8 eyebrow' => [['eyebrow' => "\xFF"], 'Brand eyebrow is not valid UTF-8.'];
+    }
+
+    public function testJoinersInsideTextAreAllowed(): void
+    {
+        // ZWJ in emoji sequences, ZWNJ in Persian; LRM / RLM marks are not embedding controls.
+        $brand = new Brand("می\u{200C}خواهم", Fixtures::light(), Fixtures::dark(), shortName: "👩\u{200D}💻", eyebrow: "a\u{200F}b", wordmark: "x\u{200D}y");
+
+        self::assertSame("می\u{200C}خواهم", $brand->name);
+        self::assertSame("👩\u{200D}💻", $brand->shortName);
+        self::assertSame("a\u{200F}b", $brand->eyebrow);
+        self::assertSame("x\u{200D}y", $brand->wordmark);
+    }
+
+    public function testTextFieldsAreTrimmed(): void
+    {
+        $brand = $this->brand(name: " \u{00A0}Beacon\u{200B}\u{3000} ");
+
+        self::assertSame('Beacon', $brand->name);
+        self::assertSame('Beacon', $brand->shortName);
+        self::assertSame('beacon', $brand->wordmark, 'the default wordmark comes from the trimmed name');
+        self::assertSame($this->brand()->version, $brand->version);
+
+        $explicit = new Brand('Beacon', Fixtures::light(), Fixtures::dark(), shortName: ' Bcn ', eyebrow: "\u{3000}Status ", wordmark: ' beacon ');
+        self::assertSame('Bcn', $explicit->shortName);
+        self::assertSame('Status', $explicit->eyebrow);
+        self::assertSame('beacon', $explicit->wordmark);
+        self::assertSame('Mid  dle', $this->brand(name: 'Mid  dle')->name, 'inner spaces are kept');
     }
 
     /**
@@ -138,6 +179,58 @@ final class BrandTest extends TestCase
         $this->expectExceptionMessage('Brand asset key "logo_dark" does not match its slot "logo_light".');
 
         $this->brand(['logo_dark' => Fixtures::asset('logo_light')]);
+    }
+
+    public function testAnAssetMustBeABrandAsset(): void
+    {
+        // IP-L1: a look-alike object would skip every BrandAsset rule.
+        $fake = new class {
+            public string $slot     = 'mark';
+            public string $url      = 'javascript:alert(1)';
+            public string $mimeType = 'text/html';
+        };
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Brand asset "mark" must be a ' . BrandAsset::class . '; got class@anonymous.');
+
+        new Brand('Beacon', Fixtures::light(), Fixtures::dark(), ['mark' => $fake]);
+    }
+
+    public function testANonObjectAssetIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Brand asset "mark" must be a ' . BrandAsset::class . '; got string.');
+
+        new Brand('Beacon', Fixtures::light(), Fixtures::dark(), ['mark' => '/brand/mark.png']);
+    }
+
+    public function testAnIntegerAssetKeyIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Brand asset key "0" does not match its slot "mark".');
+
+        new Brand('Beacon', Fixtures::light(), Fixtures::dark(), [Fixtures::asset('mark')]);
+    }
+
+    public function testATranslatableWithInvalidUtf8StringFormIsRefused(): void
+    {
+        // IP-I4: an InvalidArgumentException, not a JsonException from the version hash.
+        $eyebrow = new class implements TranslatableInterface, Stringable {
+            public function trans(TranslatorInterface $translator, ?string $locale = null): string
+            {
+                return 'x';
+            }
+
+            public function __toString(): string
+            {
+                return "bad\xC3";
+            }
+        };
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Brand eyebrow translatable has a string form that is not valid UTF-8.');
+
+        new Brand('Beacon', Fixtures::light(), Fixtures::dark(), eyebrow: $eyebrow);
     }
 
     public function testAssetReturnsADirectHit(): void

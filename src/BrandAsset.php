@@ -20,8 +20,9 @@ use function strtolower;
  * One resolved brand image: where it is served, what it is and where it comes from (spec 220, sections 2.3 and 4).
  *
  * The URL is already safe for an `<img src>` / `<link href>` attribute: a root-relative path (`/brand/logo.png`) or an
- * `https://` URL, printable ASCII without quotes, angle brackets, backslashes or whitespace. Anything else is refused
- * on construction, so consumers can print it after their usual attribute escaping.
+ * `https://` URL, printable ASCII without quotes, angle brackets, backslashes, backticks, commas, parentheses or
+ * whitespace (so it is also safe as an unquoted `srcset` candidate). Anything else is refused on construction, so
+ * consumers can print it after their usual attribute escaping.
  *
  * Uploaded assets are raster only (PNG, JPEG, WebP) and never inline-safe; config default assets (committed files) may
  * be any image type, SVG and ICO included, and are inline-safe (owner decision Q-O4).
@@ -42,8 +43,10 @@ final readonly class BrandAsset
 
     private const MIME_PATTERN   = '/^image\/[a-z0-9][a-z0-9.+-]{0,63}\z/';
     private const SHA256_PATTERN = '/^[0-9a-f]{64}\z/';
-    private const URL_FORBIDDEN  = '/[^\x21-\x7e]|["\'<>\\\\`]/';
-    private const HTTPS_PATTERN  = '/^https:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:[\/?#]|\z)/';
+    private const URL_FORBIDDEN  = '/[^\x21-\x7e]|["\'<>\\\\`,()]/';
+    // Host: dot-separated non-empty labels. Port: 1-65535 without a leading zero.
+    private const HTTPS_PATTERN = '/^https:\/\/(?:[A-Za-z0-9-]+\.)*[A-Za-z0-9-]+'
+        . '(?::(?:6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?(?:[\/?#]|\z)/';
 
     /** Slot name ({@see BrandAssetSlot}). */
     public string $slot;
@@ -165,7 +168,7 @@ final readonly class BrandAsset
     private function assertSafeUrl(string $url): void
     {
         if (!self::isSafeUrl($url)) {
-            throw new InvalidArgumentException('Unsafe brand asset URL: expected a root-relative path or an https:// URL in printable ASCII without quotes, angle brackets, backslashes or whitespace.');
+            throw new InvalidArgumentException('Unsafe brand asset URL: expected a root-relative path or an https:// URL in printable ASCII without quotes, angle brackets, backslashes, backticks, commas, parentheses or whitespace.');
         }
     }
 }

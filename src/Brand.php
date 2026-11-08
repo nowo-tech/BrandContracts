@@ -17,13 +17,14 @@ use function implode;
 use function is_string;
 use function json_encode;
 use function ksort;
+use function mb_check_encoding;
 use function mb_strtolower;
 use function preg_match;
 use function preg_match_all;
+use function preg_replace;
 use function rtrim;
 use function sprintf;
 use function substr;
-use function trim;
 
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
@@ -34,7 +35,9 @@ use const JSON_UNESCAPED_UNICODE;
  * and the resolved image assets.
  *
  * Built by a {@see BrandProviderInterface}; validated on construction, so a consumer never sees an empty name, a bad
- * colour or an unknown slot. Text fields refuse control characters (they reach email headers and manifests).
+ * colour or an unknown slot. Text fields are trimmed and refuse values that are blank or invisible, control characters,
+ * bidirectional embedding / override / isolate controls and line or paragraph separators (they reach email headers,
+ * manifests and window titles).
  */
 final readonly class Brand
 {
@@ -44,9 +47,19 @@ final readonly class Brand
     /** Length of {@see self::$version}, in hexadecimal characters. */
     public const VERSION_LENGTH = 16;
 
+    /** C0 and C1 controls (CR, LF, NUL, U+0085, ...). */
     private const CONTROL_PATTERN = '/\p{Cc}/u';
 
-    /** Brand name, never empty. */
+    /** Bidi embeddings and overrides (U+202A-U+202E), isolates (U+2066-U+2069), line and paragraph separators. */
+    private const BIDI_OR_SEPARATOR_PATTERN = '/[\x{202A}-\x{202E}\x{2066}-\x{2069}\p{Zl}\p{Zp}]/u';
+
+    /** Characters that render as nothing: Unicode spaces and format characters (U+200B, U+FEFF, ZWJ, ...). */
+    private const INVISIBLE_PATTERN = '/[\s\p{Z}\p{Cf}]+/u';
+
+    /** Leading and trailing Unicode whitespace (NBSP and U+3000 included), zero-width space, word joiner and BOM. */
+    private const TRIM_PATTERN = '/^[\s\p{Z}\x{200B}\x{2060}\x{FEFF}]+|[\s\p{Z}\x{200B}\x{2060}\x{FEFF}]+\z/u';
+
+    /** Brand name, trimmed, never blank. */
     public string $name;
 
     /** Short name, at most 12 grapheme clusters; defaults to the name cut at 12. */
@@ -78,9 +91,14 @@ final readonly class Brand
     public string $version;
 
     /**
-     * @param array<string, BrandAsset> $assets keyed by slot; each key must equal the asset's slot
+     * Text values are trimmed of leading and trailing Unicode whitespace (NBSP and zero-width space included) before
+     * they are stored and checked.
+     *
+     * @param array<string, BrandAsset> $assets keyed by slot; each value must be a BrandAsset whose slot equals its key
      * @param string|null $shortName null for the name cut at 12 grapheme clusters
      * @param string|null $wordmark null for the lower-cased name
+     *
+     * @phpstan-param array<mixed> $assets
      *
      * @throws InvalidArgumentException when a value breaks the rules of the class
      */
@@ -94,9 +112,9 @@ final readonly class Brand
         ?string $wordmark = null,
         bool $isDefault = false,
     ) {
-        $this->assertText('name', $name);
+        $name = $this->text('name', $name);
         if ($shortName !== null) {
-            $this->assertText('short name', $shortName);
+            $shortName = $this->text('short name', $shortName);
             if ($this->graphemeCount($shortName) > self::SHORT_NAME_MAX) {
                 throw new InvalidArgumentException(sprintf('Brand short name "%s" is longer than %d characters.', $shortName, self::SHORT_NAME_MAX));
             }
@@ -105,24 +123,31 @@ final readonly class Brand
             $eyebrow = null;
         }
         if (is_string($eyebrow)) {
-            $this->assertText('eyebrow', $eyebrow);
+            $eyebrow = $this->text('eyebrow', $eyebrow);
+        } elseif ($eyebrow instanceof Stringable && !mb_check_encoding((string) $eyebrow, 'UTF-8')) {
+            throw new InvalidArgumentException('Brand eyebrow translatable has a string form that is not valid UTF-8.');
         }
         if ($wordmark !== null) {
-            $this->assertText('wordmark', $wordmark);
+            $wordmark = $this->text('wordmark', $wordmark);
         }
+        $checked = [];
         foreach ($assets as $slot => $asset) {
+            if (!$asset instanceof BrandAsset) {
+                throw new InvalidArgumentException(sprintf('Brand asset "%s" must be a %s; got %s.', $slot, BrandAsset::class, get_debug_type($asset)));
+            }
             if ($slot !== $asset->slot) {
                 throw new InvalidArgumentException(sprintf('Brand asset key "%s" does not match its slot "%s".', $slot, $asset->slot));
             }
+            $checked[$asset->slot] = $asset;
         }
 
         $this->name      = $name;
-        $this->shortName = $shortName ?? $this->cut(trim($name), self::SHORT_NAME_MAX);
+        $this->shortName = $shortName ?? $this->cut($name, self::SHORT_NAME_MAX);
         $this->eyebrow   = $eyebrow;
         $this->wordmark  = $wordmark ?? mb_strtolower($name, 'UTF-8');
         $this->light     = $light;
         $this->dark      = $dark;
-        $this->assets    = $assets;
+        $this->assets    = $checked;
         $this->isDefault = $isDefault;
         $this->version   = $this->computeVersion();
     }
@@ -160,7 +185,7 @@ final readonly class Brand
 
         if ($slot === BrandAssetSlot::APP_ICON) {
             $mark = $this->assets[BrandAssetSlot::MARK] ?? null;
-            if ($mark !== null && $mark->isSquare() && $mark->minSide() >= 512) {
+            if ($mark instanceof BrandAsset && $mark->isSquare() && $mark->minSide() >= 512) {
                 return $mark;
             }
         }
@@ -212,19 +237,26 @@ final readonly class Brand
         return substr(hash('sha256', $payload), 0, self::VERSION_LENGTH);
     }
 
-    private function assertText(string $field, string $value): void
+    /**
+     * Checks a text field and returns it trimmed.
+     */
+    private function text(string $field, string $value): string
     {
-        if (trim($value) === '') {
-            throw new InvalidArgumentException(sprintf('Brand %s must not be empty.', $field));
-        }
-        // preg_match() returns false on invalid UTF-8 with the u modifier.
-        $control = preg_match(self::CONTROL_PATTERN, $value);
-        if ($control === false) {
+        if (!mb_check_encoding($value, 'UTF-8')) {
             throw new InvalidArgumentException(sprintf('Brand %s is not valid UTF-8.', $field));
         }
-        if ($control === 1) {
+        // Valid UTF-8 from here on, so the /u patterns below cannot fail.
+        if ((string) preg_replace(self::INVISIBLE_PATTERN, '', $value) === '') {
+            throw new InvalidArgumentException(sprintf('Brand %s must not be empty.', $field));
+        }
+        if (preg_match(self::CONTROL_PATTERN, $value) === 1) {
             throw new InvalidArgumentException(sprintf('Brand %s must not contain control characters.', $field));
         }
+        if (preg_match(self::BIDI_OR_SEPARATOR_PATTERN, $value) === 1) {
+            throw new InvalidArgumentException(sprintf('Brand %s must not contain bidirectional controls or line separators.', $field));
+        }
+
+        return (string) preg_replace(self::TRIM_PATTERN, '', $value);
     }
 
     /**

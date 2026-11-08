@@ -179,6 +179,27 @@ final class BrandAssetTest extends TestCase
         yield 'empty' => ['', false];
         yield 'too long' => ['/' . str_repeat('a', BrandAsset::MAX_URL_LENGTH), false];
         yield 'longest' => ['/' . str_repeat('a', BrandAsset::MAX_URL_LENGTH - 1), true];
+        // IP-I3: srcset and CSS url() separators.
+        yield 'comma' => ['/brand/a,b.png', false];
+        yield 'srcset candidate' => ['https://cdn.example.com/a.png,b 2x', false];
+        yield 'parentheses' => ['/brand/a(b).png', false];
+        yield 'semicolon' => ['/brand/a;b.png', true];
+        // IP-I3: host labels and port range.
+        yield 'host a dot' => ['https://.', false];
+        yield 'host leading dot' => ['https://.example.com/', false];
+        yield 'host trailing dot' => ['https://example.com./', false];
+        yield 'host empty label' => ['https://cdn..example.com/', false];
+        yield 'single-label host' => ['https://localhost/logo.png', true];
+        yield 'port 1' => ['https://cdn.example.com:1/', true];
+        yield 'port 65535' => ['https://cdn.example.com:65535/', true];
+        yield 'port 65536' => ['https://cdn.example.com:65536/', false];
+        yield 'port 99999' => ['https://cdn.example.com:99999/', false];
+        yield 'port 0' => ['https://cdn.example.com:0/', false];
+        yield 'port leading zero' => ['https://cdn.example.com:0443/', false];
+        yield 'empty port' => ['https://cdn.example.com:/', false];
+        yield 'port 60000' => ['https://cdn.example.com:60000', true];
+        yield 'port 65499' => ['https://cdn.example.com:65499', true];
+        yield 'port 65529' => ['https://cdn.example.com:65529', true];
     }
 
     #[DataProvider('urls')]
