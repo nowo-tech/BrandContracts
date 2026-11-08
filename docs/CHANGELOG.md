@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-08
+
 ### Added
 
 - Repository scaffold: package `nowo-tech/brand-contracts` (`Nowo\Brand\Contract\`), Docker / Makefile / CI,
@@ -50,3 +52,6 @@ All notable changes to this project are documented here. The format follows
   translatables must be `Stringable`) (IP-I1, IP-I2); new "API stability" section: new colour keys arrive optional in
   minors, `BrandAssetOrigin` may gain cases so gate on `isInlineSafe()` (IP-I6), `shades()` follows UiKit's emitter and
   may gain keys (IP-I7). SECURITY.md: text-field and URL rules updated.
+
+[Unreleased]: https://github.com/nowo-tech/BrandContracts/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/nowo-tech/BrandContracts/releases/tag/v1.0.0

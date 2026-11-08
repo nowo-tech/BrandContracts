@@ -204,6 +204,8 @@ token, and the hashing scheme may change in a minor release (never rely on a lit
 A stricter validation rule is a behaviour change for providers: after 1.0.0 it ships in a minor with a CHANGELOG and
 UPGRADING note.
 
+- **Asset URLs** (audit IP-I8): literal `,`, `(` and `)` are refused (unsafe in `srcset` and unquoted `url()`). A CDN URL with commas (e.g. `w_200,h_100`) or parentheses must percent-encode them (`%2C`, `%28`, `%29`); IPv6 literals and a trailing-dot FQDN are not accepted either.
+
 ## API reference
 
 Every public class and method carries a PHPDoc block in `src/`. Public constants: `Brand::SHORT_NAME_MAX`,
