@@ -13,6 +13,7 @@ Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
   - [Assets and the fallback chain](#assets-and-the-fallback-chain)
   - [Embedding assets in emails and PDFs](#embedding-assets-in-emails-and-pdfs)
   - [Caching with the version](#caching-with-the-version)
+- [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [API stability](#api-stability)
 - [API reference](#api-reference)
 
@@ -186,6 +187,46 @@ What the version covers for a translatable eyebrow:
 Change the key, not only the domain or parameters, when the default eyebrow changes and caches must follow. A string
 form that is not valid UTF-8 is refused with `InvalidArgumentException`. The version is a cache key, not a security
 token, and the hashing scheme may change in a minor release (never rely on a literal value).
+
+## Using it from a DDD / hexagonal application
+
+**Layer:** contract. Brand Contracts holds two ports (`BrandProviderInterface`, `BrandAssetReaderInterface`) and
+immutable, self-validating value objects (`Brand`, `BrandColors`, `BrandAsset`, `BrandAssetOrigin`,
+`BrandAssetSlot`). It has no Doctrine, no framework code and no default implementation. It depends only on
+`ext-mbstring` and `symfony/translation-contracts`.
+
+**How to use it**
+
+- Treat `BrandProviderInterface` as an outbound port of your presentation and notification layers. Implement it in
+  infrastructure, for example from InstanceSettingsBundle or a small class reading your own `Branding` aggregate,
+  and translate your model into `Brand` there. Your domain never needs to import this package.
+- Implement `BrandAssetReaderInterface` where your asset bytes live (filesystem, object storage, database). Throw
+  `BrandAssetReadException` without paths or content in the message.
+- Use `Brand::$version` as the cache key or ETag for anything derived from the brand.
+
+```php
+final class BrandingBrandProvider implements BrandProviderInterface
+{
+    public function __construct(private BrandingRepository $brandings, private CurrentProject $project) {}
+
+    public function getBrand(): Brand
+    {
+        $b = $this->brandings->forProject($this->project->id()); // your domain
+        return new Brand(
+            name: $b->name(),
+            light: BrandColors::fromArray($b->lightPalette()),
+            dark: BrandColors::fromArray($b->darkPalette()),
+            isDefault: $b->isDefault(),
+        );
+    }
+}
+```
+
+**Known limitations**
+
+- `getBrand()` takes no scope. In a multi-project host the provider resolves the current project from ambient
+  state, so set that context in Messenger handlers and CLI jobs before rendering.
+- No "brand changed" event contract yet. Compare `Brand::$version` to detect changes.
 
 ## API stability
 
