@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-10
+
 Target: **1.1.0** (new minor). Additive: `BrandProviderInterface` and every value object are unchanged. See
 [UPGRADING](UPGRADING.md#to-110).
 
@@ -31,6 +33,8 @@ Target: **1.1.0** (new minor). Additive: `BrandProviderInterface` and every valu
 - USAGE: "Brands per project or tenant" section; the DDD section's known limitations no longer list the missing scope.
 
 - USAGE: new section "Using it from a DDD / hexagonal application" (where the bundle sits in a hexagonal host, the ports, events and DTOs to build an anti-corruption layer on, and the known limitations).
+
+[1.1.0]: https://github.com/nowo-tech/BrandContracts/releases/tag/v1.1.0
 
 ## [1.0.0] - 2026-11-08
 
@@ -80,5 +84,5 @@ Target: **1.1.0** (new minor). Additive: `BrandProviderInterface` and every valu
   minors, `BrandAssetOrigin` may gain cases so gate on `isInlineSafe()` (IP-I6), `shades()` follows UiKit's emitter and
   may gain keys (IP-I7). SECURITY.md: text-field and URL rules updated.
 
-[Unreleased]: https://github.com/nowo-tech/BrandContracts/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/nowo-tech/BrandContracts/compare/v1.1.0...HEAD
 [1.0.0]: https://github.com/nowo-tech/BrandContracts/releases/tag/v1.0.0
