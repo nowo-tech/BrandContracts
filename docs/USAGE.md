@@ -13,6 +13,7 @@ Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
   - [Assets and the fallback chain](#assets-and-the-fallback-chain)
   - [Embedding assets in emails and PDFs](#embedding-assets-in-emails-and-pdfs)
   - [Caching with the version](#caching-with-the-version)
+- [Brands per project or tenant](#brands-per-project-or-tenant)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [API stability](#api-stability)
 - [API reference](#api-reference)
@@ -22,6 +23,10 @@ Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
 | Type | Role |
 | --- | --- |
 | `BrandProviderInterface` | `getBrand(): Brand`. Implemented by a provider (InstanceSettings, a host class). |
+| `ScopedBrandProviderInterface` | 1.1: also `getBrandFor(BrandScope): Brand`, for Messenger / CLI code ([Brands per project or tenant](#brands-per-project-or-tenant)). |
+| `BrandScope` | 1.1: opaque project / tenant / site id. |
+| `BrandScopeResolverInterface` | 1.1: optional provider port, `currentScope(): ?BrandScope`. |
+| `BrandLookup` | 1.1: `brandFor($provider, ?BrandScope)`, scoped when possible, `getBrand()` otherwise; `scopedBrandOrNull()` never falls back. |
 | `Brand` | Name, short name, eyebrow, wordmark, light / dark colours, assets, `isDefault`, `version`. |
 | `BrandColors` | Seven `#rrggbb` colours of one mode. |
 | `BrandAsset` | One image: slot, URL, media type, size, sha256, origin. |
@@ -188,11 +193,73 @@ Change the key, not only the domain or parameters, when the default eyebrow chan
 form that is not valid UTF-8 is refused with `InvalidArgumentException`. The version is a cache key, not a security
 token, and the hashing scheme may change in a minor release (never rely on a literal value).
 
+## Brands per project or tenant
+
+Since 1.1. `getBrand()` returns the brand of the ambient context: the request, the current tenant. Code without that
+context (a Messenger handler, a console command, a scheduled email) can ask for an explicit scope instead.
+
+**Provider side.** Implement `ScopedBrandProviderInterface` (it extends `BrandProviderInterface`):
+
+```php
+use Nowo\Brand\Contract\{Brand, BrandScope, BrandScopeResolverInterface, ScopedBrandProviderInterface};
+
+final class ProjectBrandProvider implements ScopedBrandProviderInterface
+{
+    public function __construct(
+        private BrandingRepository $brandings,            // your storage
+        private BrandScopeResolverInterface $scopes,      // optional: the ambient project, if any
+        private Brand $instanceDefault,
+    ) {}
+
+    public function getBrand(): Brand
+    {
+        $scope = $this->scopes->currentScope();
+
+        return $scope === null ? $this->instanceDefault : $this->getBrandFor($scope);
+    }
+
+    public function getBrandFor(BrandScope $scope): Brand
+    {
+        return $this->brandings->brandOf($scope->id) ?? $this->instanceDefault; // unknown scope: defaults
+    }
+}
+```
+
+`BrandScope::$id` is opaque: a project UUID, a tenant slug, a site id. It is 1 to 191 printable ASCII characters
+without whitespace, so it is safe in logs. It may still contain `/ \ : { } ( ) @` and `../`: hash or encode it
+(`hash('xxh128', $scope->id)`, `rawurlencode()`) before you put it in a PSR-6 cache key or a file path. Ids are
+compared as given (case-sensitive); normalise them the way your store does. An unknown scope returns the defaults with
+`isDefault`, never an exception. `BrandScopeResolverInterface` is optional; it lets `getBrand()` and `getBrandFor()` share one lookup.
+Memoise per scope, and reset the memo between requests or messages in a long-running worker.
+
+**Consumer side.** Keep injecting `?BrandProviderInterface` and resolve through `BrandLookup`:
+
+```php
+use Nowo\Brand\Contract\{BrandLookup, BrandScope};
+
+$brand = BrandLookup::brandFor($this->brand, new BrandScope($message->projectId));
+```
+
+With a scope and a scoped provider it calls `getBrandFor()`; without a scope, or with a provider that only knows one
+brand (InstanceSettingsBundle today), it calls `getBrand()`, as before 1.1. With a provider that is not scoped the
+scope is **ignored**: you get whatever ambient brand the provider sees, which in a worker serving several tenants may be
+unset or stale. When that would be wrong, use `BrandLookup::scopedBrandOrNull($provider, $scope)`: it returns null
+instead of the ambient brand, so you can fall back to your own configuration or fail. Asset bytes need no scope:
+`BrandAssetReaderInterface::read()` takes the `BrandAsset` of the brand you resolved.
+
+**Trust boundary.** The scope selects, it does not authorize: `getBrandFor()` is not an access check. Derive the scope
+from trusted state: the project of a message your application created, a console option run by an operator, or the
+route owner after your access check. Never build it from raw request input (`$request->query`, a form field), or any
+visitor can fetch, and enumerate, other tenants' brands: `isDefault` and `version` already tell an existing id from an
+unknown one. Providers should serve only publishable brand data from `getBrandFor()`. A `BrandScope` re-validates its
+id when it is unserialized; prefer carrying the scalar id in messages anyway.
+
 ## Using it from a DDD / hexagonal application
 
-**Layer:** contract. Brand Contracts holds two ports (`BrandProviderInterface`, `BrandAssetReaderInterface`) and
+**Layer:** contract. Brand Contracts holds the ports (`BrandProviderInterface`, its scoped variant
+`ScopedBrandProviderInterface`, the optional `BrandScopeResolverInterface`, `BrandAssetReaderInterface`) and
 immutable, self-validating value objects (`Brand`, `BrandColors`, `BrandAsset`, `BrandAssetOrigin`,
-`BrandAssetSlot`). It has no Doctrine, no framework code and no default implementation. It depends only on
+`BrandAssetSlot`, `BrandScope`). It has no Doctrine, no framework code and no default implementation. It depends only on
 `ext-mbstring` and `symfony/translation-contracts`.
 
 **How to use it**
@@ -224,8 +291,9 @@ final class BrandingBrandProvider implements BrandProviderInterface
 
 **Known limitations**
 
-- `getBrand()` takes no scope. In a multi-project host the provider resolves the current project from ambient
-  state, so set that context in Messenger handlers and CLI jobs before rendering.
+- Scoped lookups (1.1) work only with providers that implement `ScopedBrandProviderInterface`; with any other provider
+  `BrandLookup::brandFor()` returns the ambient `getBrand()`. InstanceSettingsBundle serves one brand per instance and
+  is not scoped.
 - No "brand changed" event contract yet. Compare `Brand::$version` to detect changes.
 
 ## API stability
@@ -249,7 +317,7 @@ UPGRADING note.
 
 ## API reference
 
-Every public class and method carries a PHPDoc block in `src/`. Public constants: `Brand::SHORT_NAME_MAX`,
+Every public class and method carries a PHPDoc block in `src/`. Public constants: `BrandScope::MAX_ID_LENGTH`, `Brand::SHORT_NAME_MAX`,
 `Brand::VERSION_LENGTH`, `BrandColors::KEYS`, `BrandAsset::UPLOAD_MIME_TYPES`, `BrandAsset::SVG_MIME_TYPE`,
 `BrandAsset::MAX_URL_LENGTH`, `BrandAsset::SQUARE_TOLERANCE`, `BrandAssetSlot::*`, `ColorMath::AA_TEXT`,
 `ColorMath::AA_NON_TEXT`, `ColorMath::DEFAULT_BORDER_PERCENT`.
