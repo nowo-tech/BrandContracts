@@ -20,7 +20,8 @@ See [docs/FRANKENPHP-WORKER-AUDIT.md](docs/FRANKENPHP-WORKER-AUDIT.md).
 ## Features
 
 - **`BrandProviderInterface`**: one method, `getBrand(): Brand`. InstanceSettings implements it; a host can too, in a
-  few lines. No default provider: consumers keep their config as the fallback.
+  few lines. No default provider: consumers keep their config as the fallback. Multi-project hosts can implement
+  `ScopedBrandProviderInterface::getBrandFor(BrandScope)` for Messenger and CLI code (1.1).
 - **`Brand`**: name (never empty), short name (at most 12 graphemes), eyebrow (string or translatable), wordmark,
   light and dark `BrandColors`, resolved assets, `isDefault` and a `version` hash for ETags and cache keys.
 - **Logo fallback chain**: `Brand::asset('favicon')` tries favicon, mark, app icon (spec 220, section 4.2).

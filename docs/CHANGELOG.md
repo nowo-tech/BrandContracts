@@ -5,7 +5,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Target: **1.1.0** (new minor). Additive: `BrandProviderInterface` and every value object are unchanged. See
+[UPGRADING](UPGRADING.md#to-110).
+
+### Added
+
+- Scoped brand lookup for code without ambient context (Messenger handlers, console commands), DDD P2:
+  - `BrandScope` (`final readonly`): an opaque project / tenant / site public id, 1 to 191 printable ASCII characters
+    without whitespace; `equals()`.
+  - `ScopedBrandProviderInterface extends BrandProviderInterface`: `getBrandFor(BrandScope $scope): Brand`. An unknown
+    scope returns the provider's defaults with `isDefault`, like `getBrand()`.
+  - `BrandScopeResolverInterface::currentScope(): ?BrandScope`: optional port for providers that derive `getBrand()`
+    from an ambient scope.
+  - `BrandLookup::brandFor($provider, ?BrandScope $scope = null)`: uses `getBrandFor()` when a scope is given and the
+    provider supports it, `getBrand()` otherwise.
+
 ### Documentation
+
+- USAGE: "Brands per project or tenant" section; the DDD section's known limitations no longer list the missing scope.
 
 - USAGE: new section "Using it from a DDD / hexagonal application" (where the bundle sits in a hexagonal host, the ports, events and DTOs to build an anti-corruption layer on, and the known limitations).
 
