@@ -26,7 +26,7 @@ Namespace `Nowo\Brand\Contract`. Design source: nowo-tech spec 220, section 2.3.
 | `ScopedBrandProviderInterface` | 1.1: also `getBrandFor(BrandScope): Brand`, for Messenger / CLI code ([Brands per project or tenant](#brands-per-project-or-tenant)). |
 | `BrandScope` | 1.1: opaque project / tenant / site id. |
 | `BrandScopeResolverInterface` | 1.1: optional provider port, `currentScope(): ?BrandScope`. |
-| `BrandLookup` | 1.1: `brandFor($provider, ?BrandScope)`, scoped when possible, `getBrand()` otherwise. |
+| `BrandLookup` | 1.1: `brandFor($provider, ?BrandScope)`, scoped when possible, `getBrand()` otherwise; `scopedBrandOrNull()` never falls back. |
 | `Brand` | Name, short name, eyebrow, wordmark, light / dark colours, assets, `isDefault`, `version`. |
 | `BrandColors` | Seven `#rrggbb` colours of one mode. |
 | `BrandAsset` | One image: slot, URL, media type, size, sha256, origin. |
@@ -226,8 +226,10 @@ final class ProjectBrandProvider implements ScopedBrandProviderInterface
 ```
 
 `BrandScope::$id` is opaque: a project UUID, a tenant slug, a site id. It is 1 to 191 printable ASCII characters
-without whitespace, so it is safe in logs and cache keys. An unknown scope returns the defaults with `isDefault`, never
-an exception. `BrandScopeResolverInterface` is optional; it lets `getBrand()` and `getBrandFor()` share one lookup.
+without whitespace, so it is safe in logs. It may still contain `/ \ : { } ( ) @` and `../`: hash or encode it
+(`hash('xxh128', $scope->id)`, `rawurlencode()`) before you put it in a PSR-6 cache key or a file path. Ids are
+compared as given (case-sensitive); normalise them the way your store does. An unknown scope returns the defaults with
+`isDefault`, never an exception. `BrandScopeResolverInterface` is optional; it lets `getBrand()` and `getBrandFor()` share one lookup.
 Memoise per scope, and reset the memo between requests or messages in a long-running worker.
 
 **Consumer side.** Keep injecting `?BrandProviderInterface` and resolve through `BrandLookup`:
@@ -239,8 +241,18 @@ $brand = BrandLookup::brandFor($this->brand, new BrandScope($message->projectId)
 ```
 
 With a scope and a scoped provider it calls `getBrandFor()`; without a scope, or with a provider that only knows one
-brand (InstanceSettingsBundle today), it calls `getBrand()`, as before 1.1. Asset bytes need no scope:
+brand (InstanceSettingsBundle today), it calls `getBrand()`, as before 1.1. With a provider that is not scoped the
+scope is **ignored**: you get whatever ambient brand the provider sees, which in a worker serving several tenants may be
+unset or stale. When that would be wrong, use `BrandLookup::scopedBrandOrNull($provider, $scope)`: it returns null
+instead of the ambient brand, so you can fall back to your own configuration or fail. Asset bytes need no scope:
 `BrandAssetReaderInterface::read()` takes the `BrandAsset` of the brand you resolved.
+
+**Trust boundary.** The scope selects, it does not authorize: `getBrandFor()` is not an access check. Derive the scope
+from trusted state: the project of a message your application created, a console option run by an operator, or the
+route owner after your access check. Never build it from raw request input (`$request->query`, a form field), or any
+visitor can fetch, and enumerate, other tenants' brands: `isDefault` and `version` already tell an existing id from an
+unknown one. Providers should serve only publishable brand data from `getBrandFor()`. A `BrandScope` re-validates its
+id when it is unserialized; prefer carrying the scalar id in messages anyway.
 
 ## Using it from a DDD / hexagonal application
 

@@ -28,7 +28,8 @@ framework wiring, no default provider.
   `getBrandFor(BrandScope): Brand` (unknown scope = defaults with `isDefault`). `BrandScope` accepts 1 to 191 printable
   ASCII characters without whitespace. `BrandScopeResolverInterface::currentScope(): ?BrandScope` is an optional
   provider port. `BrandLookup::brandFor()` calls `getBrandFor()` only with a scope and a scoped provider, and
-  `getBrand()` otherwise.
+  `getBrand()` otherwise; `BrandLookup::scopedBrandOrNull()` returns null for an unscoped provider. `BrandScope`
+  re-validates on unserialize. The scope is a selector, not an authorization (docs).
 - **FR-003**: `Brand` refuses, in text fields, invalid UTF-8, values that are blank or invisible-only (Unicode
   whitespace and `\p{Cf}`), control characters, bidi embedding / override / isolate controls (U+202A–U+202E,
   U+2066–U+2069) and `\p{Zl}` / `\p{Zp}` (ZWJ / ZWNJ inside text stay allowed); a short name over 12 grapheme

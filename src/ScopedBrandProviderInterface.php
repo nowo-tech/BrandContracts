@@ -12,6 +12,11 @@ namespace Nowo\Brand\Contract;
  * project or tenant they render for. Consumers keep injecting {@see BrandProviderInterface} and use the scoped call
  * when the provider supports it ({@see BrandLookup::brandFor()} does the check).
  *
+ * The scope selects, it does not authorize: `getBrandFor()` is not an access check. Callers derive the scope from
+ * trusted state (a message the application created, an operator's console option, the route owner after the access
+ * check), never from raw request input. Serve only publishable brand data from it: `isDefault` and `version` already
+ * tell an existing scope from an unknown one.
+ *
  * The same rules as `getBrand()` apply: cheap to call several times, memoised per scope at most per request or
  * message, may throw when backed by a database.
  */

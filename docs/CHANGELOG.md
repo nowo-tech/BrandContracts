@@ -18,7 +18,13 @@ Target: **1.1.0** (new minor). Additive: `BrandProviderInterface` and every valu
   - `BrandScopeResolverInterface::currentScope(): ?BrandScope`: optional port for providers that derive `getBrand()`
     from an ambient scope.
   - `BrandLookup::brandFor($provider, ?BrandScope $scope = null)`: uses `getBrandFor()` when a scope is given and the
-    provider supports it, `getBrand()` otherwise.
+    provider supports it, `getBrand()` otherwise (the scope is then ignored).
+  - `BrandLookup::scopedBrandOrNull($provider, BrandScope $scope)`: `getBrandFor()` or null when the provider is not
+    scoped, for consumers that must not fall back to the ambient brand.
+  - `BrandScope` re-validates its id on `unserialize()` (`__serialize()` / `__unserialize()`); a crafted value throws
+    `InvalidArgumentException`.
+- Docs (audit KM): the scope selects, it does not authorize, and must come from trusted state, never raw request input;
+  hash or encode the id before using it in a PSR-6 cache key or a path.
 
 ### Documentation
 
