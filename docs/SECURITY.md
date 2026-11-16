@@ -15,6 +15,7 @@
 - [Logging](#logging)
 - [Dependencies and updates](#dependencies-and-updates)
 - [Provider and consumer checklist](#provider-and-consumer-checklist)
+- [Release security checklist (12.4.1)](#release-security-checklist-1241)
 - [Audit status](#audit-status)
 
 ## Scope
@@ -117,6 +118,23 @@ never asset bytes; the URL is not echoed in the unsafe-URL message.
 - Consumers: inline bytes only when `isInlineSafe()`; otherwise use `<img src>`, a CID attachment or
   `BrandAssetDataUri`. Gate on `isInlineSafe()`, never on an exhaustive `match` over `BrandAssetOrigin` (it may gain
   cases in a minor). Escape text fields for their context.
+
+## Release security checklist (12.4.1)
+
+Before each release the maintainer confirms every item (a note in the release PR or tag is enough).
+
+| Item | Status for this library |
+| --- | --- |
+| `docs/SECURITY.md` current | Reviewed against the release diff. |
+| `.env` in `.gitignore`, no secrets committed | The package has no environment files or credentials. |
+| Safe config / recipe | No bundle, no config, no recipe: interfaces and value objects only. |
+| Input and output (validation and escaping) | Value objects validate text, URLs, colours, slots and scopes; consumers escape per context (see above). |
+| Dependencies (`composer audit`) | `composer audit` in CI; runtime is `symfony/translation-contracts` only. |
+| No-secret logs | The package logs nothing. |
+| Safe cryptography | Only a non-secret SHA-256 content version; no keys, no randomness. |
+| Permissions and exposure | No I/O, routes or persistence; the scope selects, it does not authorize. |
+| Limits and DoS | Bounded lengths (scope 191, text fields, URLs); no recursion or unbounded loops. |
+| AI security audit passed (REQ-SEC-004) | Latest grade in `BUNDLES_SECURITY_ANALYSIS.md` (monorepo) and the Audit status below. |
 
 ## Audit status
 

@@ -14,3 +14,7 @@ Every production file under `src/` is listed here (constitution principle III).
 | `src/BrandAssetReadException.php` | Reader failure | FR-008 |
 | `src/BrandAssetDataUri.php` | Data URI / media type from sniffed bytes | FR-008 |
 | `src/ColorMath.php` | Contrast, mixes, shades, contrast warnings | FR-009 |
+| `src/BrandScope.php` | Opaque scope id (1 to 191 printable ASCII, no whitespace), re-validated on unserialize | FR-010 |
+| `src/ScopedBrandProviderInterface.php` | `getBrandFor(BrandScope)` provider seam | FR-010 |
+| `src/BrandScopeResolverInterface.php` | Optional `currentScope(): ?BrandScope` provider port | FR-010 |
+| `src/BrandLookup.php` | `brandFor()` / `scopedBrandOrNull()` scope-aware lookup | FR-010 |

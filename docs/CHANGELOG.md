@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Documentation
+
+- Spec Kit inventory maps the 1.1 scoped-lookup files; `docs/SECURITY.md` gains the Release security checklist (12.4.1); issue templates restored to the canonical text (REQ compliance sweep 2026-11-16).
+
 ## [1.1.0] - 2026-11-10
 
 Target: **1.1.0** (new minor). Additive: `BrandProviderInterface` and every value object are unchanged. See

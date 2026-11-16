@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 <!--
-- Please do not report an issue for a version of `brand-contracts` that is no longer supported. Currently supported versions are listed here: https://github.com/nowo-tech/BrandContracts#requirements
+- Please do not report an issue for a version of `brand-contracts` that is no longer supported. Currently supported versions are listed here: https://github.com/nowo-tech/BrandContracts#version-information
 - Please fill in this template according to your issue.
 - Please keep the table shown below at the top of your issue.
 - You can retrieve `brand-contracts` version by running `composer info | grep "brand-contracts"`.
@@ -19,9 +19,9 @@ assignees: ''
 
 | Q                           | A
 | ----------------------------| -----------------------
-| `brand-contracts` version     | x.y.z
+| `BrandContracts` version        | x.y.z
 | PHP version                 | x.y.z
-| Provider (InstanceSettings / host class) | …
+| Database                    | MySQL / PostgreSQL / SQLite / Other
 
 #### Summary
 
