@@ -1,6 +1,6 @@
 ---
 name: "❓ Support Question"
-about: You have a question about this library or need help?
+about: You have a question about this bundle or need help?
 title: ''
 labels: ''
 assignees: ''
