@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- PHP 8.6: `composer.json` allows PHP below 8.7 (was below 8.6). CI adds a forward-compatibility workflow with a
+  PHP 8.6 cell.
+
 ### Documentation
 
 - Spec Kit inventory maps the 1.1 scoped-lookup files; `docs/SECURITY.md` gains the Release security checklist (12.4.1); issue templates restored to the canonical text (REQ compliance sweep 2026-11-16).

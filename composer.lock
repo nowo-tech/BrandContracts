@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6f84ffcbe95d9617ca26e531b1a2a3e1",
+    "content-hash": "0d4faadf268171b78efa41e7ebae17b2",
     "packages": [
         {
             "name": "symfony/translation-contracts",
@@ -4809,7 +4809,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=8.2 <8.6",
+        "php": ">=8.2 <8.7",
         "ext-mbstring": "*"
     },
     "platform-dev": {},
