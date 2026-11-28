@@ -8,4 +8,4 @@ The package is a plain PHP library: there is no bundle to register and no config
 MailKit, LegalKit, SeoKit, host renderers) type-hint its interfaces; a provider (InstanceSettings, or a small host
 class) implements `BrandProviderInterface`.
 
-Requirements: PHP `>=8.2 <8.6` with `mbstring`, and `symfony/translation-contracts` ^3.4.
+Requirements: PHP `>=8.2 <8.7` with `mbstring`, and `symfony/translation-contracts` ^3.4.

@@ -34,6 +34,6 @@ final class PackageManifestTest extends TestCase
 
         $require = $manifest['require'] ?? null;
         self::assertTrue(is_array($require));
-        self::assertSame('>=8.2 <8.6', $require['php'] ?? null);
+        self::assertSame('>=8.2 <8.7', $require['php'] ?? null);
     }
 }

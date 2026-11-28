@@ -57,7 +57,7 @@ final class InvoiceMailer
 
 ## Requirements
 
-- PHP 8.2+ (`>=8.2 <8.6`) with `mbstring`
+- PHP 8.2+ (`>=8.2 <8.7`) with `mbstring`
 - `symfony/translation-contracts` ^3.4 (the only runtime dependency; no framework needed)
 
 ## Configuration
